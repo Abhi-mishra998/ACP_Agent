@@ -1,0 +1,607 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * ACP PREMIUM DESIGN SYSTEM v4.0
+ * Theme: Titanium-Obsidian (Enterprise Standard)
+ * Spacing: 8px grid | Typography: 12px minimum | WCAG AA
+ */
+
+:root {
+  --bg-base: #030303;
+  --bg-surface: #0a0a0a;
+  --bg-surface-elevated: #111111;
+  --bg-surface-hover: #161616;
+
+  --border-subtle: rgba(255, 255, 255, 0.04);
+  --border-default: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.15);
+  --border-accent: rgba(255, 255, 255, 0.3);
+
+  --text-main: #ffffff;
+  --text-muted: #a1a1aa;
+  --text-dim: #52525b;
+
+  --accent-success: #22c55e;
+  --accent-warning: #f59e0b;
+  --accent-danger: #ef4444;
+
+  --font-display: "Inter", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
+  --shadow-xl: 0 20px 25px rgba(0, 0, 0, 0.2);
+
+  /* Glow tokens */
+  --glow-primary: 0 0 20px rgba(255, 255, 255, 0.08), 0 0 40px rgba(255, 255, 255, 0.04);
+  --glow-danger:  0 0 20px rgba(239, 68, 68, 0.25),   0 0 40px rgba(239, 68, 68, 0.12);
+  --glow-success: 0 0 20px rgba(34, 197, 94, 0.2),    0 0 40px rgba(34, 197, 94, 0.08);
+
+  /* 8px spacing scale */
+  --space-1: 8px;
+  --space-2: 16px;
+  --space-3: 24px;
+  --space-4: 32px;
+  --space-5: 40px;
+  --space-6: 48px;
+}
+
+@layer base {
+  * {
+    -webkit-tap-highlight-color: transparent;
+    box-sizing: border-box;
+  }
+
+  ::selection {
+    background-color: rgba(255, 255, 255, 0.15);
+    color: #ffffff;
+  }
+
+  html,
+  body,
+  #root {
+    width: 100%;
+    height: 100%;
+    min-height: 100vh;
+    margin: 0;
+    padding: 0;
+    overflow-x: hidden;
+    background-color: var(--bg-base);
+    color: var(--text-main);
+    font-family: var(--font-display);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    color-scheme: dark;
+  }
+
+  body {
+    background-image: radial-gradient(circle at 50% -20%, #111 0%, #030303 60%);
+  }
+
+  /* Scrollbar */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #262626 transparent;
+  }
+
+  ::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background-color: #262626;
+    border-radius: 999px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  /* Headings */
+  h1, h2, h3, h4, h5, h6 {
+    letter-spacing: -0.025em;
+    font-weight: 700;
+    line-height: 1.2;
+  }
+
+  /* All form elements inherit dark color-scheme so browsers render native widgets dark */
+  input, select, textarea, button {
+    color-scheme: dark;
+    font-family: inherit;
+  }
+
+  /* Ensure typed text is always white in any input/textarea — belt-and-suspenders */
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  textarea {
+    color: #ffffff;
+    -webkit-text-fill-color: #ffffff;
+    caret-color: #ffffff;
+  }
+
+  input:not([type="checkbox"]):not([type="radio"])::placeholder,
+  textarea::placeholder {
+    color: #52525b;
+    -webkit-text-fill-color: #52525b;
+    opacity: 1;
+  }
+
+  /* Select text must always be white — appearance:none can desync color on some browsers */
+  select {
+    color: #ffffff;
+    -webkit-text-fill-color: #ffffff;
+  }
+
+  select option {
+    background-color: #111111;
+    color: #ffffff;
+  }
+
+  /* Focus: keyboard-only visible, high contrast */
+  :focus-visible {
+    outline: 2px solid rgba(255, 255, 255, 0.6);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  /* Remove focus ring for mouse users */
+  :focus:not(:focus-visible) {
+    outline: none;
+  }
+}
+
+@layer components {
+
+  /* ── CARD ─────────────────────────────────────────────────────────────── */
+  .card-premium {
+    border-radius: 0.75rem;
+    overflow: hidden;
+    transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
+    background-color: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .card-premium:hover {
+    background-color: var(--bg-surface-elevated);
+    border-color: var(--border-default);
+  }
+
+  /* ── INPUT ────────────────────────────────────────────────────────────── */
+  .input-standard {
+    width: 100%;
+    padding: 0.5rem 0.875rem;
+    border-radius: 0.5rem;
+    font-size: 0.8125rem; /* 13px */
+    line-height: 1.5;
+    transition: border-color 200ms cubic-bezier(0.4, 0, 0.2, 1),
+                background-color 200ms cubic-bezier(0.4, 0, 0.2, 1);
+    background-color: var(--bg-surface-elevated);
+    border: 1px solid var(--border-default);
+    /* Explicit color on all layers so text is always white regardless of OS theme */
+    color: #ffffff;
+    -webkit-text-fill-color: #ffffff;
+    caret-color: #ffffff;
+    color-scheme: dark;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+
+  /* Prevent browser autofill from overriding our background and text color */
+  .input-standard:-webkit-autofill,
+  .input-standard:-webkit-autofill:hover,
+  .input-standard:-webkit-autofill:focus {
+    -webkit-box-shadow: 0 0 0 40px var(--bg-surface-elevated) inset !important;
+    -webkit-text-fill-color: #ffffff !important;
+    caret-color: #ffffff !important;
+  }
+
+  .input-standard::placeholder {
+    color: #52525b;
+    -webkit-text-fill-color: #52525b;
+    font-size: 0.8125rem;
+    opacity: 1;
+  }
+
+  .input-standard:hover {
+    border-color: var(--border-strong);
+    background-color: #141414;
+  }
+
+  .input-standard:focus {
+    outline: none;
+    border-color: rgba(255, 255, 255, 0.35);
+    background-color: #141414;
+    box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.05);
+  }
+
+  /* Select elements need extra enforcement — appearance:none drops native colors */
+  select.input-standard {
+    color: #ffffff;
+    -webkit-text-fill-color: #ffffff;
+    /* Custom chevron arrow */
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23737373' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    padding-right: 2rem;
+    cursor: pointer;
+  }
+
+  select.input-standard option {
+    background-color: #111111;
+    color: #ffffff;
+    font-size: 0.8125rem;
+  }
+
+  select.input-standard option:checked {
+    background-color: #1f1f1f;
+  }
+
+  /* Date input — invert the OS calendar icon so it's visible on dark bg */
+  .input-standard[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(0.6) brightness(1.4);
+    cursor: pointer;
+    opacity: 0.6;
+  }
+
+  .input-standard[type="date"]::-webkit-calendar-picker-indicator:hover {
+    opacity: 1;
+  }
+
+  /* Select arrow (legacy class kept for backwards compat) */
+  .input-standard.select-input {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23737373' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    padding-right: 2.5rem;
+  }
+
+  /* Compact input height variant — use with h-8 or h-9 */
+  .input-compact {
+    padding-top: 0.25rem;
+    padding-bottom: 0.25rem;
+  }
+
+  /* ── LABEL ────────────────────────────────────────────────────────────── */
+  .label-standard {
+    display: block;
+    font-size: 0.6875rem; /* 11px — labels only */
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--text-dim);
+    margin-bottom: 0.375rem;
+  }
+
+  /* ── TEXT UTILITIES ───────────────────────────────────────────────────── */
+  .text-label {
+    font-size: 0.6875rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--text-dim);
+  }
+
+  .text-value {
+    font-size: 1rem;
+    line-height: 1.5rem;
+    font-weight: 600;
+    letter-spacing: -0.025em;
+    color: var(--text-main);
+  }
+
+  /* ── BUTTON BASE ──────────────────────────────────────────────────────── */
+  .btn-premium {
+    position: relative;
+    overflow: hidden;
+    transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .btn-premium:active:not(:disabled) {
+    transform: scale(0.97);
+  }
+
+  .btn-premium:disabled {
+    opacity: 0.45;
+    pointer-events: none;
+    cursor: not-allowed;
+  }
+
+  .btn-premium::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-color: transparent;
+    transition: background-color 150ms cubic-bezier(0.4, 0, 0.2, 1);
+    pointer-events: none;
+  }
+
+  .btn-premium:hover:not(:disabled)::after {
+    background-color: rgba(255, 255, 255, 0.05);
+  }
+
+  /* ── PAGE HEADER ──────────────────────────────────────────────────────── */
+  .page-header {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  }
+
+  @media (min-width: 1024px) {
+    .page-header {
+      flex-direction: row;
+      align-items: flex-end;
+      justify-content: space-between;
+    }
+  }
+
+  /* ── STATUS BADGE ─────────────────────────────────────────────────────── */
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.125rem 0.5rem;
+    border-radius: 9999px;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    border: 1px solid;
+  }
+
+  /* ── SECTION HEADER ───────────────────────────────────────────────────── */
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    color: white;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+  }
+
+  /* ── TABLE ────────────────────────────────────────────────────────────── */
+  .table-container {
+    overflow: hidden;
+    border-radius: 0.75rem;
+    border: 1px solid var(--border-subtle);
+    background-color: #080808;
+  }
+
+  .table-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .table-base {
+    width: 100%;
+    text-align: left;
+    border-collapse: collapse;
+  }
+
+  .table-th {
+    padding: 0.875rem 1.5rem;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    color: #525252;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    white-space: nowrap;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  .table-td {
+    padding: 0.75rem 1.5rem;
+    font-size: 0.75rem;
+    color: #a1a1aa;
+    transition: color 150ms;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  .table-row {
+    transition: background-color 150ms;
+  }
+
+  .table-row:hover {
+    background-color: rgba(255, 255, 255, 0.018);
+  }
+
+  .table-row:hover .table-td {
+    color: #ffffff;
+  }
+
+  /* ── ERROR BANNER ─────────────────────────────────────────────────────── */
+  .error-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1rem 1.25rem;
+    border-radius: 0.75rem;
+    background-color: rgba(239, 68, 68, 0.06);
+    border: 1px solid rgba(239, 68, 68, 0.15);
+  }
+
+  /* ── KPI STRIP ────────────────────────────────────────────────────────── */
+  .kpi-strip {
+    padding: 1.5rem 2rem;
+    border-radius: 1.25rem;
+    background-color: rgba(255, 255, 255, 0.01);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* ── METRIC CARD ──────────────────────────────────────────────────────── */
+  .metric-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.625rem 0;
+  }
+
+  .metric-row + .metric-row {
+    border-top: 1px solid var(--border-subtle);
+  }
+}
+
+@layer utilities {
+
+  .grid-baseline {
+    background-size: 4px 4px;
+    background-image: radial-gradient(circle, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+  }
+
+  .animate-fade-in {
+    animation: fadeIn 0.35s ease-out forwards;
+  }
+
+  .animate-scale-in {
+    animation: scaleIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  .animate-slide-down {
+    animation: slideDown 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  .backdrop-premium {
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    background-color: rgba(0, 0, 0, 0.4);
+  }
+
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Screen-reader only */
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
+  }
+
+  /* Truncate single line */
+  .truncate-1 {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* Glow utilities */
+  .glow-primary {
+    box-shadow: var(--glow-primary);
+  }
+
+  .glow-danger {
+    box-shadow: var(--glow-danger);
+  }
+
+  /* Hover lift micro-interaction */
+  .hover-lift {
+    transition: transform 200ms cubic-bezier(0.4, 0, 0.2, 1),
+                box-shadow 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .hover-lift:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  }
+
+  /* Pulse critical — for high-severity indicators */
+  .pulse-critical {
+    animation: pulseCritical 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  /* Glassmorphism */
+  .glass-panel {
+    background: rgba(10, 10, 10, 0.85);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+  }
+}
+
+/* Print styles for PDF export */
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+
+  .sidebar-hidden-print,
+  header[role="banner"],
+  aside {
+    display: none !important;
+  }
+
+  .card-premium {
+    border: 1px solid #e5e7eb !important;
+    background: #ffffff !important;
+    break-inside: avoid;
+  }
+
+  * {
+    color: #000000 !important;
+    background: transparent !important;
+  }
+}
+
+/* ── ANIMATIONS ──────────────────────────────────────────────────────────── */
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.97) translateY(4px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes shimmer {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(100%); }
+}
+
+@keyframes pulseCritical {
+  0%, 100% { opacity: 1; box-shadow: 0 0 6px rgba(239, 68, 68, 0.5); }
+  50%       { opacity: 0.6; box-shadow: 0 0 16px rgba(239, 68, 68, 0.8); }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── RECHARTS OVERRIDES ───────────────────────────────────────────────────── */
+
+.recharts-tooltip-wrapper {
+  outline: none !important;
+}
+
+.recharts-default-tooltip {
+  border-radius: 0.5rem !important;
+}

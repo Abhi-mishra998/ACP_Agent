@@ -1,0 +1,71 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: policy-deployment
+  namespace: acp
+  labels:
+    app: policy
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: policy
+  template:
+    metadata:
+      labels:
+        app: policy
+    spec:
+      containers:
+      - name: policy
+        image: acp-policy:latest
+        ports:
+        - containerPort: 8000
+        envFrom:
+        - configMapRef:
+            name: acp-config
+        - secretRef:
+            name: acp-secrets
+        env:
+        - name: OPA_URL
+          value: "http://localhost:8181"
+        resources:
+          limits:
+            cpu: "500m"
+            memory: "512Mi"
+      - name: opa
+        image: openpolicyagent/opa:0.63.0
+        args:
+        - "run"
+        - "--server"
+        - "--addr=0.0.0.0:8181"
+        - "--log-level=debug"
+        ports:
+        - containerPort: 8181
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8181
+          initialDelaySeconds: 5
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8181
+          initialDelaySeconds: 3
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: policy-service
+  namespace: acp
+spec:
+  selector:
+    app: policy
+  ports:
+  - name: api
+    protocol: TCP
+    port: 8000
+    targetPort: 8000
+  - name: opa
+    protocol: TCP
+    port: 8181
+    targetPort: 8181

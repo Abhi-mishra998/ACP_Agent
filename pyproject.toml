@@ -1,0 +1,56 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "acp"
+version = "0.1.0"
+description = "Agent Control Plane (ACP)"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+    "sqlalchemy[asyncio]",
+    "asyncpg",
+    "redis>=4.2.0",
+    "pydantic[email]",
+    "pydantic-settings",
+    "httpx",
+    "python-jose[cryptography]",
+    "passlib[bcrypt]",
+    "structlog",
+    "prometheus-fastapi-instrumentator",
+    "opentelemetry-api",
+    "opentelemetry-sdk",
+    "opentelemetry-instrumentation-fastapi",
+    "opentelemetry-exporter-otlp",
+    "opentelemetry-semantic-conventions",
+    "alembic",
+    "tenacity",
+    "bcrypt",
+    "locust",
+    "prometheus-client",
+    "groq",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-asyncio",
+    "pytest-cov",
+    "ruff",
+    "mypy",
+    "PyJWT",
+]
+
+# M-14 fix: include both sdk* and services* so all ACP code is pip-installable
+[tool.setuptools.packages.find]
+include = ["sdk*", "services*"]
+
+# (optional but recommended)
+[tool.setuptools]
+package-dir = {"" = "."}
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["services", "sdk", "tests"]

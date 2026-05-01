@@ -1,0 +1,6 @@
+"postgres" "postgres"
+"registry_user" "registry_dev_CHANGE_ME"
+"identity_user" "identity_dev_CHANGE_ME"
+"audit_user" "audit_dev_CHANGE_ME"
+"api_user" "api_dev_CHANGE_ME"
+"usage_user" "usage_dev_CHANGE_ME"

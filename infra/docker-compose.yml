@@ -1,0 +1,548 @@
+services:
+  # ─────────────────────────────────────────
+  # DATABASE
+  # ─────────────────────────────────────────
+  postgres:
+    image: postgres:15-alpine
+    container_name: acp_postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-acp}
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: "512M"
+          cpus: "0.5"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ─────────────────────────────────────────
+  # PGBouncer (Production-Ready Config)
+  # ─────────────────────────────────────────
+  pgbouncer:
+    image: edoburu/pgbouncer:latest
+    container_name: acp_pgbouncer
+    # Using mounted config for production reliability
+    volumes:
+      - ./pgbouncer.ini:/etc/pgbouncer/pgbouncer.ini:ro
+      - ./userlist.txt:/etc/pgbouncer/userlist.txt:ro
+    ports:
+      - "6432:6432"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      # nc -z is more reliable for pgbouncer health checks
+      test: ["CMD", "nc", "-z", "127.0.0.1", "6432"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ─────────────────────────────────────────
+  # REDIS
+  # ─────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: acp_redis
+    # AS-2 FIX: Enable AOF persistence so audit chain heads survive restarts
+    command: redis-server --appendonly yes --appendfsync everysec --save 60 1000
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ─────────────────────────────────────────
+  # OPA (Distributed Policy Architecture)
+  # ─────────────────────────────────────────
+  bundle-server:
+    image: python:3.11-slim
+    container_name: acp_bundle_server
+    working_dir: /app
+    volumes:
+      - ../services/policy/policies:/policies:ro
+    command: >
+      sh -c "mkdir -p /tmp/bundle && 
+             tar -czf /tmp/bundle/bundle.tar.gz -C /policies . &&
+             cd /tmp/bundle &&
+             python -m http.server 8182"
+    ports:
+      - "8182:8182"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8182/bundle.tar.gz')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  opa:
+    # debug image ships busybox (wget) — required for healthcheck in distroless-based builds
+    image: openpolicyagent/opa:latest-debug
+    platform: linux/arm64
+    container_name: acp_opa
+    ports:
+      - "8181:8181"
+    environment:
+      - GOMAXPROCS=2
+    volumes:
+      - ./opa-config.yaml:/opa-config.yaml:ro
+    command:
+      - "run"
+      - "--server"
+      - "--addr=0.0.0.0:8181"
+      - "--config-file=/opa-config.yaml"
+      - "--log-level=info"
+    depends_on:
+      bundle-server:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:8181/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # ─────────────────────────────────────────
+  # DISTRIBUTED BRAIN LAYER
+  # ─────────────────────────────────────────
+  behavior:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    container_name: acp_behavior
+    user: "999:999"
+    env_file:
+      - .env
+    ports:
+      - "8007:8000"
+    command: uvicorn services.behavior.main:app --host 0.0.0.0 --port 8000
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: on-failure
+
+  intelligence:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    container_name: acp_intelligence
+    user: "999:999"
+    env_file:
+      - .env
+    ports:
+      - "8008:8000"
+    command: uvicorn services.intelligence.main:app --host 0.0.0.0 --port 8000
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: on-failure
+
+  learning:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    container_name: acp_learning
+    user: "999:999"
+    env_file:
+      - .env
+    ports:
+      - "8009:8000"
+    command: uvicorn services.learning.main:app --host 0.0.0.0 --port 8000
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: on-failure
+
+
+
+  insight:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    container_name: acp_insight
+    user: "999:999"
+    env_file:
+      - .env
+    ports:
+      - "8011:8000"
+    command: uvicorn services.insight.main:app --host 0.0.0.0 --port 8000
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: on-failure
+
+  insight_worker:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    container_name: acp_insight_worker
+    user: "999:999"
+    env_file:
+      - .env
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+    command: python -m services.insight.worker
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: always
+
+  # ─────────────────────────────────────────
+  # MICROSERVICES
+  # ─────────────────────────────────────────
+
+  registry:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    container_name: acp_registry
+    user: "999:999"
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://registry_user:registry_dev_CHANGE_ME@pgbouncer:6432/acp_registry
+    ports:
+      - "8001:8000"
+    command: >
+      sh -c "cd /app/services/registry && alembic upgrade head &&
+             cd /app && uvicorn services.registry.main:app --host 0.0.0.0 --port 8000 --reload"
+    volumes:
+      - ../services:/app/services:ro
+      - ../sdk:/app/sdk:ro
+    depends_on:
+      pgbouncer:
+        condition: service_healthy
+    restart: on-failure
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  identity:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    container_name: acp_identity
+    user: "999:999"
+    env_file:
+      - .env
+    ports:
+      - "8002:8000"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://identity_user:identity_dev_CHANGE_ME@pgbouncer:6432/acp_identity
+      - REDIS_CLUSTER_ENABLED=false
+      # DU-6 FIX: JWT_SECRET_KEY MUST be set in env — no weak fallback
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:?JWT_SECRET_KEY is required}
+      - REGISTRY_SERVICE_URL=http://registry:8000
+    command: >
+      sh -c "cd /app/services/identity && alembic upgrade head &&
+             cd /app && uvicorn services.identity.main:app --host 0.0.0.0 --port 8000 --reload"
+    volumes:
+      - ../services:/app/services:ro
+      - ../sdk:/app/sdk:ro
+    depends_on:
+      pgbouncer:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      registry:
+        condition: service_started
+    restart: on-failure
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 45s
+
+  policy:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    container_name: acp_policy
+    user: "999:999"
+    env_file:
+      - .env
+    ports:
+      - "8003:8000"
+    volumes:
+      - ../services/policy:/app/services/policy
+      - ../sdk:/app/sdk
+    environment:
+      - OPA_URL=http://opa:8181
+      - REGISTRY_SERVICE_URL=http://registry:8000
+      - AUDIT_SERVICE_URL=http://audit:8000
+      # DU-6 FIX: no weak fallback
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:?JWT_SECRET_KEY is required}
+    command: uvicorn services.policy.main:app --host 0.0.0.0 --port 8000
+    depends_on:
+      opa:
+        condition: service_started
+      registry:
+        condition: service_started
+    restart: on-failure
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  audit:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    container_name: acp_audit
+    user: "999:999"
+    env_file:
+      - .env
+    ports:
+      - "8004:8000"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://audit_user:audit_dev_CHANGE_ME@pgbouncer:6432/acp_audit
+      - REDIS_URL=redis://redis:6379/0
+      - REDIS_CLUSTER_ENABLED=false
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:?JWT_SECRET_KEY is required}
+    command: >
+      sh -c "cd /app/services/audit && alembic upgrade head &&
+             cd /app && uvicorn services.audit.main:app --host 0.0.0.0 --port 8000 --reload"
+    volumes:
+      - ../services:/app/services:ro
+      - ../sdk:/app/sdk:ro
+    depends_on:
+      pgbouncer:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: on-failure
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 45s
+
+  api:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    container_name: acp_api
+    user: "999:999"
+    env_file:
+      - .env
+    ports:
+      - "8005:8000"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://api_user:api_dev_CHANGE_ME@pgbouncer:6432/acp_api
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:?JWT_SECRET_KEY is required}
+    command: >
+      sh -c "cd /app/services/api && alembic upgrade head &&
+             cd /app && uvicorn services.api.main:app --host 0.0.0.0 --port 8000 --reload"
+    volumes:
+      - ../services:/app/services:ro
+      - ../sdk:/app/sdk:ro
+    depends_on:
+      pgbouncer:
+        condition: service_healthy
+    restart: on-failure
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  usage:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    container_name: acp_usage
+    user: "999:999"
+    env_file:
+      - .env
+    ports:
+      - "8006:8000"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://usage_user:usage_dev_CHANGE_ME@pgbouncer:6432/acp_usage
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:?JWT_SECRET_KEY is required}
+    command: >
+      sh -c "cd /app/services/usage && alembic upgrade head &&
+             cd /app && uvicorn services.usage.main:app --host 0.0.0.0 --port 8000 --reload"
+    volumes:
+      - ../services:/app/services:ro
+      - ../sdk:/app/sdk:ro
+    depends_on:
+      pgbouncer:
+        condition: service_healthy
+    restart: on-failure
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  gateway:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    container_name: acp_gateway
+    user: "999:999"
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"
+    environment:
+      - IDENTITY_SERVICE_URL=http://identity:8000
+      - POLICY_SERVICE_URL=http://policy:8000
+      - AUDIT_SERVICE_URL=http://audit:8000
+      - REGISTRY_SERVICE_URL=http://registry:8000
+      - API_SERVICE_URL=http://api:8000
+      - USAGE_SERVICE_URL=http://usage:8000
+      - DECISION_SERVICE_URL=http://decision:8000
+      - FORENSICS_SERVICE_URL=http://forensics:8000
+      - INSIGHT_SERVICE_URL=http://insight:8000
+      - REDIS_CLUSTER_ENABLED=false
+      # P0-2 FIX: no weak fallback — JWT_SECRET_KEY MUST be set and must match identity service
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:?JWT_SECRET_KEY is required}
+    command: uvicorn services.gateway.main:app --host 0.0.0.0 --port 8000 --reload
+    volumes:
+      - ../services:/app/services:ro
+      - ../sdk:/app/sdk:ro
+    depends_on:
+      identity:
+        condition: service_started
+      policy:
+        condition: service_started
+      audit:
+        condition: service_started
+      api:
+        condition: service_started
+      usage:
+        condition: service_started
+      decision:
+        condition: service_started
+      redis:
+        condition: service_healthy
+    restart: on-failure
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  # NEW: Decision service — orchestration engine for policy, behavior, and kill-switch
+  decision:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    container_name: acp_decision
+    user: "999:999"
+    env_file:
+      - .env
+    ports:
+      - "8010:8000"
+    volumes:
+      - ../services/decision:/app/services/decision
+      - ../sdk:/app/sdk
+    environment:
+      # Reads AuditLog for /decision/history; CostEngine uses Redis only
+      - DATABASE_URL=postgresql+asyncpg://audit_user:audit_dev_CHANGE_ME@pgbouncer:6432/acp_audit
+      - REGISTRY_SERVICE_URL=http://registry:8000
+      - POLICY_SERVICE_URL=http://policy:8000
+      - BEHAVIOR_SERVICE_URL=http://behavior:8000
+      - USAGE_SERVICE_URL=http://usage:8000
+      - REDIS_CLUSTER_ENABLED=false
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:?JWT_SECRET_KEY is required}
+    command: uvicorn services.decision.main:app --host 0.0.0.0 --port 8000
+    depends_on:
+      pgbouncer:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: on-failure
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  # NEW: Forensics service — replay and investigation from audit logs
+  forensics:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    container_name: acp_forensics
+    user: "999:999"
+    env_file:
+      - .env
+    ports:
+      - "8012:8000"
+    environment:
+      # Reads AuditLog for replay and investigation
+      - DATABASE_URL=postgresql+asyncpg://audit_user:audit_dev_CHANGE_ME@pgbouncer:6432/acp_audit
+      - REDIS_CLUSTER_ENABLED=false
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:?JWT_SECRET_KEY is required}
+    command: uvicorn services.forensics.main:app --host 0.0.0.0 --port 8000
+    depends_on:
+      pgbouncer:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      audit:
+        condition: service_started
+    restart: on-failure
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  # ACP UI (React Frontend — nginx reverse-proxies /api to gateway)
+  ui:
+    build:
+      context: ../ui
+      dockerfile: Dockerfile
+      args:
+        # Build-time: empty = use nginx proxy (relative URLs); override for external deployments
+        - VITE_GATEWAY_URL=${VITE_GATEWAY_URL:-}
+    container_name: acp_ui
+    ports:
+      - "5173:80"
+    depends_on:
+      gateway:
+        condition: service_started
+    restart: on-failure
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+volumes:
+  postgres_data:
+  redis_data:
+
+

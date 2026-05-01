@@ -1,0 +1,16 @@
+# OPA Configuration for Production-Grade Distributed Policy Architecture
+# ───────────────────────────────────────────────────────────────────────────
+
+services:
+  bundle-server:
+    url: http://bundle-server:8182
+
+bundles:
+  acp:
+    service: bundle-server
+    resource: bundle.tar.gz
+    polling_delay_seconds: 10 # Rapid updates for agile policy changes
+
+# Monitoring and Health
+status:
+  console: true

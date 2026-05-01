@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: opa-deployment
+  namespace: acp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: opa
+  template:
+    metadata:
+      labels:
+        app: opa
+    spec:
+      containers:
+      - name: opa
+        image: openpolicyagent/opa:latest-static
+        args:
+        - "run"
+        - "--server"
+        - "--addr=0.0.0.0:8181"
+        ports:
+        - containerPort: 8181
+        resources:
+          limits:
+            cpu: "500m"
+            memory: "512Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: opa-service
+  namespace: acp
+spec:
+  selector:
+    app: opa
+  ports:
+  - protocol: TCP
+    port: 8181
+    targetPort: 8181

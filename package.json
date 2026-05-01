@@ -1,0 +1,27 @@
+{
+  "name": "acp",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "directories": {
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Abhi-mishra998/ACP_Agent.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Abhi-mishra998/ACP_Agent/issues"
+  },
+  "homepage": "https://github.com/Abhi-mishra998/ACP_Agent#readme",
+  "dependencies": {
+    "dotenv": "^17.4.2"
+  }
+}

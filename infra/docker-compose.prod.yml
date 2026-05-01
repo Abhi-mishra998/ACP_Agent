@@ -1,0 +1,392 @@
+version: "3.8"
+
+services:
+  # ─────────────────────────────────────────
+  # DATABASE
+  # ─────────────────────────────────────────
+  postgres:
+    image: postgres:15-alpine
+    container_name: acp_postgres_prod
+    environment:
+      POSTGRES_USER_FILE: /run/secrets/db_user
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+      POSTGRES_DB: acp
+    volumes:
+      - postgres_data_prod:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    secrets:
+      - db_user
+      - db_password
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─────────────────────────────────────────
+  # REDIS
+  # ─────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: acp_redis_prod
+    command: redis-server --appendonly yes --maxmemory 1gb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data_prod:/data
+    restart: always
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─────────────────────────────────────────
+  # PGBouncer
+  # ─────────────────────────────────────────
+  pgbouncer:
+    image: edoburu/pgbouncer:latest
+    container_name: acp_pgbouncer_prod
+    environment:
+      DB_USER_FILE: /run/secrets/db_user
+      DB_PASSWORD_FILE: /run/secrets/db_password
+      DB_HOST: postgres
+      DB_NAME: acp_registry,acp_identity,acp_audit,acp_api,acp_usage,acp
+      LISTEN_PORT: 6432
+      POOL_MODE: transaction
+      MAX_CLIENT_CONN: 10000
+      DEFAULT_POOL_SIZE: 20
+      IGNORE_STARTUP_PARAMETERS: statement_timeout
+    secrets:
+      - db_user
+      - db_password
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p 6432"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─────────────────────────────────────────
+  # OPA
+  # ─────────────────────────────────────────
+  opa:
+    image: openpolicyagent/opa:latest
+    container_name: acp_opa
+    ports:
+      - "8181:8181"
+    volumes:
+      - ../services/policy/policies:/policies
+    command:
+      - "run"
+      - "--server"
+      - "--addr=0.0.0.0:8181"
+      - "--log-level=debug"
+      - "/policies"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8181/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  # ─────────────────────────────────────────
+  # MIGRATION JOBS (run-once, restart: on-failure)
+  # ─────────────────────────────────────────
+
+  migrate_api:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        DB_PASS=$$(cat /run/secrets/db_password)
+        export DATABASE_URL="postgresql+asyncpg://api_user:$${DB_PASS}@pgbouncer:6432/acp_api"
+        cd /app/services/api && alembic upgrade head
+    secrets:
+      - db_password
+    depends_on:
+      pgbouncer:
+        condition: service_healthy
+    restart: on-failure
+
+  migrate_identity:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        DB_PASS=$$(cat /run/secrets/db_password)
+        export DATABASE_URL="postgresql+asyncpg://identity_user:$${DB_PASS}@pgbouncer:6432/acp_identity"
+        cd /app/services/identity && alembic upgrade head
+    secrets:
+      - db_password
+    depends_on:
+      pgbouncer:
+        condition: service_healthy
+    restart: on-failure
+
+  migrate_registry:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        DB_PASS=$$(cat /run/secrets/db_password)
+        export DATABASE_URL="postgresql+asyncpg://registry_user:$${DB_PASS}@pgbouncer:6432/acp_registry"
+        cd /app/services/registry && alembic upgrade head
+    secrets:
+      - db_password
+    depends_on:
+      pgbouncer:
+        condition: service_healthy
+    restart: on-failure
+
+  migrate_audit:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        DB_PASS=$$(cat /run/secrets/db_password)
+        export DATABASE_URL="postgresql+asyncpg://audit_user:$${DB_PASS}@pgbouncer:6432/acp_audit"
+        cd /app/services/audit && alembic upgrade head
+    secrets:
+      - db_password
+    depends_on:
+      pgbouncer:
+        condition: service_healthy
+    restart: on-failure
+
+  migrate_usage:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        DB_PASS=$$(cat /run/secrets/db_password)
+        export DATABASE_URL="postgresql+asyncpg://usage_user:$${DB_PASS}@pgbouncer:6432/acp_usage"
+        cd /app/services/usage && alembic upgrade head
+    secrets:
+      - db_password
+    depends_on:
+      pgbouncer:
+        condition: service_healthy
+    restart: on-failure
+
+  # ─────────────────────────────────────────
+  # MICROSERVICES
+  # ─────────────────────────────────────────
+
+  registry:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        DB_PASS=$$(cat /run/secrets/db_password)
+        export DATABASE_URL="postgresql+asyncpg://registry_user:$${DB_PASS}@pgbouncer:6432/acp_registry"
+        exec uvicorn services.registry.main:app --host 0.0.0.0 --port 8000
+    secrets:
+      - db_password
+    depends_on:
+      migrate_registry:
+        condition: service_completed_successfully
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  identity:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        DB_PASS=$$(cat /run/secrets/db_password)
+        JWT_SECRET=$$(cat /run/secrets/jwt_secret)
+        export DATABASE_URL="postgresql+asyncpg://identity_user:$${DB_PASS}@pgbouncer:6432/acp_identity"
+        export REDIS_URL="redis://redis:6379/0"
+        export REDIS_CLUSTER_ENABLED="false"
+        export REGISTRY_SERVICE_URL="http://registry:8000"
+        export JWT_SECRET_KEY="$${JWT_SECRET}"
+        exec uvicorn services.identity.main:app --host 0.0.0.0 --port 8000
+    secrets:
+      - db_password
+      - jwt_secret
+    depends_on:
+      migrate_identity:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      registry:
+        condition: service_healthy
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  policy:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    environment:
+      OPA_URL: http://opa:8181
+      REGISTRY_SERVICE_URL: http://registry:8000
+    # policy has no DB — no migration or db secret needed
+    command: uvicorn services.policy.main:app --host 0.0.0.0 --port 8000
+    depends_on:
+      opa:
+        condition: service_healthy
+      registry:
+        condition: service_healthy
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  audit:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        DB_PASS=$$(cat /run/secrets/db_password)
+        export DATABASE_URL="postgresql+asyncpg://audit_user:$${DB_PASS}@pgbouncer:6432/acp_audit"
+        export REDIS_URL="redis://redis:6379/0"
+        export REDIS_CLUSTER_ENABLED="false"
+        exec uvicorn services.audit.main:app --host 0.0.0.0 --port 8000
+    secrets:
+      - db_password
+    depends_on:
+      migrate_audit:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  api:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        DB_PASS=$$(cat /run/secrets/db_password)
+        export DATABASE_URL="postgresql+asyncpg://api_user:$${DB_PASS}@pgbouncer:6432/acp_api"
+        exec uvicorn services.api.main:app --host 0.0.0.0 --port 8000
+    secrets:
+      - db_password
+    depends_on:
+      migrate_api:
+        condition: service_completed_successfully
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  usage:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        DB_PASS=$$(cat /run/secrets/db_password)
+        export DATABASE_URL="postgresql+asyncpg://usage_user:$${DB_PASS}@pgbouncer:6432/acp_usage"
+        exec uvicorn services.usage.main:app --host 0.0.0.0 --port 8000
+    secrets:
+      - db_password
+    depends_on:
+      migrate_usage:
+        condition: service_completed_successfully
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  gateway:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    ports:
+      - "443:8000"
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        JWT_SECRET=$$(cat /run/secrets/jwt_secret)
+        export IDENTITY_SERVICE_URL="http://identity:8000"
+        export POLICY_SERVICE_URL="http://policy:8000"
+        export AUDIT_SERVICE_URL="http://audit:8000"
+        export REGISTRY_SERVICE_URL="http://registry:8000"
+        export API_SERVICE_URL="http://api:8000"
+        export USAGE_SERVICE_URL="http://usage:8000"
+        export REDIS_URL="redis://redis:6379/0"
+        export REDIS_CLUSTER_ENABLED="false"
+        export ENVIRONMENT="production"
+        export JWT_SECRET_KEY="$${JWT_SECRET}"
+        exec uvicorn services.gateway.main:app --host 0.0.0.0 --port 8000
+    secrets:
+      - jwt_secret
+    depends_on:
+      identity:
+        condition: service_healthy
+      policy:
+        condition: service_healthy
+      audit:
+        condition: service_healthy
+      registry:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+      usage:
+        condition: service_healthy
+    restart: always
+
+# ─────────────────────────────────────────
+# SECRETS
+# ─────────────────────────────────────────
+secrets:
+  db_user:
+    file: ./secrets/db_user.txt
+  db_password:
+    file: ./secrets/db_password.txt
+  jwt_secret:
+    file: ./secrets/jwt_secret.txt
+
+# ─────────────────────────────────────────
+# VOLUMES
+# ─────────────────────────────────────────
+volumes:
+  postgres_data_prod:
+  redis_data_prod:

@@ -1,0 +1,125 @@
+# ==========================================
+# Python
+# ==========================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# ==========================================
+# Virtual Environments
+# ==========================================
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# ==========================================
+# Environment Variables & Secrets
+# ==========================================
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.env
+!infra/docker-compose.yml # Keep config files, but exclude .env
+infra/.env
+infra/userlist.txt
+infra/kubernetes/base/acp-secret.yaml
+ui/.env.local
+**/secrets/**
+**/*.pem
+**/*.key
+**/*.pub
+**/*.cert
+
+# ==========================================
+# IDEs / Editors / OS
+# ==========================================
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+.claude/
+.history/
+
+# ==========================================
+# Logs & Database
+# ==========================================
+*.log
+api.log
+audit.log
+gateway.log
+identity.log
+policy.log
+registry.log
+ui.log
+usage.log
+*.sqlite
+*.db
+
+# ==========================================
+# Testing & Linting
+# ==========================================
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+.hypothesis/
+.coverage
+.coverage.*
+coverage.xml
+*.cover
+htmlcov/
+nosetests.xml
+pip-log.txt
+pip-delete-this-directory.txt
+
+# ==========================================
+# Node (UI)
+# ==========================================
+node_modules/
+dist/
+build/
+.npm/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+.next/
+out/
+
+# ==========================================
+# Scratch & Debug
+# ==========================================
+scratch/
+debug_*.py
+ruff_errors_*.txt
+temp/
+tmp/
+*.tmp
+*.bak
+*.swp

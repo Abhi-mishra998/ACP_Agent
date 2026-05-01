@@ -1,0 +1,135 @@
+{
+  "files_scanned": [
+    "acp/services/gateway/main.py",
+    "acp/services/gateway/middleware.py",
+    "acp/services/gateway/auth.py",
+    "acp/services/gateway/inference_proxy.py",
+    "acp/services/identity/main.py",
+    "acp/services/identity/router.py",
+    "acp/services/identity/token_service.py",
+    "acp/services/policy/main.py",
+    "acp/services/policy/router.py",
+    "acp/services/policy/opa_client.py",
+    "acp/services/policy/policies/agent_policy.rego",
+    "acp/services/registry/main.py",
+    "acp/services/registry/router.py",
+    "acp/services/registry/service.py",
+    "acp/services/registry/models.py",
+    "acp/services/audit/main.py",
+    "acp/services/audit/router.py",
+    "acp/services/audit/writer.py",
+    "acp/services/audit/integrity.py",
+    "acp/services/usage/router/usage.py",
+    "acp/services/api/router/api_key.py",
+    "acp/sdk/common/constants.py",
+    "acp/ui/src/services/api.js",
+    "acp/ui/src/pages/ExecutiveDashboard.jsx",
+    "acp/infra/docker-compose.yml",
+    "acp/infra/kubernetes/network-policy.yaml"
+  ],
+  "issues": [
+    {
+      "severity": "P0",
+      "file": "acp/sdk/client.py",
+      "line": 0,
+      "type": "Missing File",
+      "description": "SDK client.py is missing from source tree. Critical blocker for agent integration."
+    },
+    {
+      "severity": "P0",
+      "file": "acp/services/identity/token_service.py",
+      "line": 186,
+      "type": "Logic",
+      "description": "Redis key mismatch in token revocation. issue() uses 'acp:subject:' prefix, but revoke_all_for_agent() uses REDIS_AGENT_PREFIX ('acp:agent:'). Revocation is broken."
+    },
+    {
+      "severity": "P0",
+      "file": "acp/services/policy/router.py",
+      "line": 32,
+      "type": "Logic",
+      "description": "Uninitialized httpx clients (_registry_client and _audit_client). Service will crash on first evaluation request."
+    },
+    {
+      "severity": "P0",
+      "file": "acp/services/registry/main.py",
+      "line": 30,
+      "type": "Logic",
+      "description": "main.py fails to call set_registry_redis(). Cache invalidation is effectively disabled."
+    },
+    {
+      "severity": "P0",
+      "file": "acp/infra/kubernetes/network-policy.yaml",
+      "line": 156,
+      "type": "Infra",
+      "description": "NetworkPolicy blocks critical services (decision, behavior, registry) from reaching Redis. System will fail in K8s."
+    },
+    {
+      "severity": "P1",
+      "file": "acp/services/audit/main.py",
+      "line": 256,
+      "type": "Concurrecy",
+      "description": "Check-then-set race condition in cryptographic chain updates when multiple Audit workers process events for the same tenant. Risking chain corruption."
+    },
+    {
+      "severity": "P1",
+      "file": "acp/services/usage/router/usage.py",
+      "line": 35,
+      "type": "API Contract",
+      "description": "API path mismatch for billing summary. Usage service provides /usage/summary but Gateway calls /usage/usage/summary."
+    },
+    {
+      "severity": "P1",
+      "file": "acp/services/gateway/main.py",
+      "line": 150,
+      "type": "API Contract",
+      "description": "Gateway missing /audit prefix when calling Audit service endpoints (risk timeline, top threats). Mismatch with Audit service routing."
+    },
+    {
+      "severity": "P1",
+      "file": "acp/services/identity/router.py",
+      "line": 374,
+      "type": "Security/Logic",
+      "description": "refresh_token issues new token based on old claims without re-validating role/tenant state in DB. Role changes won't propagate until next full login."
+    },
+    {
+      "severity": "P1",
+      "file": "acp/services/gateway/main.py",
+      "line": 120,
+      "type": "Performance/Stability",
+      "description": "Direct httpx.AsyncClient instantiation per request in proxies. Inefficient and risks connection exhaustion."
+    },
+    {
+      "severity": "P2",
+      "file": "acp/services/audit/integrity.py",
+      "line": 31,
+      "type": "Scalability",
+      "description": "Audit chain verification is O(N) over all logs per tenant. Will not scale to production volumes."
+    }
+  ],
+  "api_mismatches": [
+    {
+      "service": "Gateway -> Usage",
+      "path": "/billing/summary",
+      "issue": "Calls /usage/usage/summary, but endpoint is /usage/summary."
+    },
+    {
+      "service": "Gateway -> Audit",
+      "path": "/risk/timeline",
+      "issue": "Calls /logs/risk/timeline, but endpoint is /audit/logs/risk/timeline."
+    },
+    {
+      "service": "Gateway -> Audit",
+      "path": "/risk/top-threats",
+      "issue": "Calls /logs/risk/top-threats, but endpoint is /audit/logs/risk/top-threats."
+    },
+    {
+      "service": "Gateway",
+      "path": "/auth/token",
+      "issue": "proxy_auth_token flattens 'data' field but subsequent proxies in main.py just return raw resp.json(). Inconsistent API response structure."
+    }
+  ],
+  "unused_code": [],
+  "missing_imports": [],
+  "security_issues": [],
+  "integration_issues": []
+}

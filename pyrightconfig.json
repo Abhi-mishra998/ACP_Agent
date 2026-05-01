@@ -1,0 +1,16 @@
+{
+    "venvPath": ".",
+    "venv": ".venv",
+    "pythonVersion": "3.11",
+    "executionEnvironments": [
+        {
+            "root": "."
+        }
+    ],
+    "exclude": [
+        "**/__pycache__",
+        "**/.venv"
+    ],
+    "reportMissingImports": true,
+    "reportMissingTypeStubs": false
+}
